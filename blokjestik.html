@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VR Blokjes Weg Tikken - Oculus Quest 2</title>
+  <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+    }
+
+    /* Stijl voor de HTML-knop (buiten VR) */
+    #resetButton {
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      font-size: 20px;
+      padding: 10px 20px;
+      background-color: #f39c12;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      z-index: 1000;
+      display: none; /* Verberg de knop in het begin */
+    }
+
+    #resetButton:hover {
+      background-color: #e67e22;
+    }
+  </style>
+</head>
+<body>
+
+<div id="counter">Aangetikte blokken: 0</div>
+<button id="resetButton">Reset Spel</button>
+
+<!-- A-Frame Scene -->
+<a-scene vr-mode-ui="enabled: true">
+  <!-- Grondvlak -->
+  <a-plane position="0 0 -5" rotation="-90 0 0" width="20" height="20" color="#A9A9A9"></a-plane>
+
+  <!-- Licht -->
+  <a-light type="ambient" color="#ffffff" intensity="0.7"></a-light>
+  <a-light type="directional" intensity="1" position="1 1 1"></a-light>
+
+  <!-- Rechter handcontroller voor Oculus Quest 2 -->
+  <a-entity id="right-hand" oculus-touch-controls="hand: right" raycaster="objects: .clickable" line="color: red; opacity: 0.75"></a-entity>
+
+  <!-- Linker handcontroller voor Oculus Quest 2 -->
+  <a-entity id="left-hand" oculus-touch-controls="hand: left" raycaster="objects: .clickable" line="color: blue; opacity: 0.75"></a-entity>
+
+  <!-- VR HUD (User Interface) -->
+  <a-entity id="ui" position="0 1.6 -2">
+    <a-plane position="0 1 0" width="1.5" height="0.5" color="#3498db"></a-plane>
+    <a-text id="vr-counter" value="Aangetikte blokken: 0" position="0 1.01 0.1" align="center" color="#ffffff" width="1.4"></a-text>
+  </a-entity>
+
+  <!-- Startscherm -->
+  <a-entity id="start-screen" position="0 1 -3">
+    <a-plane position="0 0 0" width="2" height="1" color="#3498db"></a-plane>
+    <a-text value="Welkom bij Blokken Weg Tikken!" position="0 0.2 0.1" align="center" color="#ffffff" width="1.8"></a-text>
+    <a-text value="Druk op Start om te beginnen" position="0 -0.1 0.1" align="center" color="#ffffff" width="1.8"></a-text>
+    <a-entity id="start-button" geometry="primitive: box; width: 0.5; height: 0.2; depth: 0.1" material="color: "#ffffff" position="0 -0.4 0.1">
+      <a-text value="Start" align="center" color="	#A9A9A9" position="0 0 0.01"></a-text>
+    </a-entity>
+  </a-entity>
+
+  <!-- Camera -->
+  <a-entity camera position="0 1.6 0" look-controls="enabled: true"></a-entity>
+
+  <!-- JavaScript voor het dynamisch genereren van blokken -->
+  <script>
+    const totalBlocks = 8;  // Aantal blokken
+    let tappedBlocks = 0;   // Teller voor aantal aangetikte blokken
+    const blocks = [];      // Lijst voor posities van de blokken
+    const scene = document.querySelector("a-scene");
+    const startScreen = document.getElementById("start-screen");
+    const resetButton = document.getElementById("resetButton");
+
+    // Functie om de teller bij te werken
+    function updateCounter() {
+      const counterElement = document.getElementById("counter");
+      const vrCounterElement = document.getElementById("vr-counter");
+      counterElement.innerText = `Aangetikte blokken: ${tappedBlocks}`;
+      vrCounterElement.setAttribute("value", `Aangetikte blokken: ${tappedBlocks}`);
+    }
+
+    // Functie om een willekeurige positie te genereren zonder overlap
+    function generateRandomPosition() {
+      let isOverlapping = true;
+      let randomX, randomY, randomZ;
+
+      while (isOverlapping) {
+        randomX = Math.random() * 8 - 4; // Willekeurige positie op de X-as (-4 tot 4)
+        randomY = Math.random() * 3 + 1; // Willekeurige positie op de Y-as (1 tot 4)
+        randomZ = Math.random() * -4 - 1; // Willekeurige positie op de Z-as (-1 tot -5)
+
+        // Controleer of deze positie overlapt met andere blokken
+        isOverlapping = blocks.some((block) => {
+          const distanceX = Math.abs(block.x - randomX);
+          const distanceY = Math.abs(block.y - randomY);
+          const distanceZ = Math.abs(block.z - randomZ);
+          return distanceX < 1 && distanceY < 1 && distanceZ < 1; // Controleer overlap
+        });
+      }
+
+      return { x: randomX, y: randomY, z: randomZ };
+    }
+
+    // Functie om een blok te genereren op een willekeurige positie
+    function generateBlock(index) {
+      const position = generateRandomPosition();
+
+      const block = document.createElement("a-box");
+      block.setAttribute("position", `${position.x} ${position.y} ${position.z}`);
+      block.setAttribute("color", "#3498db");
+      block.setAttribute("depth", "1");
+      block.setAttribute("width", "1");
+      block.setAttribute("height", "1");
+      block.setAttribute("id", `block-${index}`);
+      block.setAttribute("class", "clickable");  // Maak het blok clickable
+
+      // Voeg interactie toe: het blok verdwijnt als je het aanklikt
+      block.addEventListener("click", () => {
+        removeBlock(block);
+      });
+
+      scene.appendChild(block);
+
+      // Voeg de positie van dit blok toe aan de lijst van bestaande blokken
+      blocks.push({ x: position.x, y: position.y, z: position.z });
+    }
+
+    // Functie om een blok te verwijderen en een nieuw blok te maken
+    function removeBlock(block) {
+      // Verwijder het blok uit de lijst en DOM
+      const blockIndex = blocks.findIndex(
+        (b) =>
+          b.x === parseFloat(block.getAttribute("position").x) &&
+          b.y === parseFloat(block.getAttribute("position").y) &&
+          b.z === parseFloat(block.getAttribute("position").z)
+      );
+      blocks.splice(blockIndex, 1);
+      block.parentNode.removeChild(block);
+
+      tappedBlocks++; // Verhoog het aantal aangetikte blokken
+      updateCounter(); // Werk de teller bij
+
+      // Creëer een nieuw blok op een willekeurige positie
+      generateBlock(blockIndex + 1);
+    }
+
+    // Genereer de initiële set van blokken
+    function generateInitialBlocks() {
+      for (let i = 1; i <= totalBlocks; i++) {
+        generateBlock(i);
+      }
+    }
+
+    // Start het spel bij het klikken op de startknop
+    const startButton = document.getElementById("start-button");
+    startButton.addEventListener("click", () => {
+      startScreen.setAttribute("visible", "false"); // Verberg het startscherm
+      resetButton.style.display = "block"; // Toon de reset-knop
+      generateInitialBlocks(); // Begin met het genereren van blokken
+    });
+
+    // Reset het spel (HTML knop)
+    resetButton.addEventListener("click", () {=> {
+      tappedBlocks = 0; // Reset de score
+      updateCounter();   // Werk de teller bij
+      scene.innerHTML = "";  // Leeg de scène
+      blocks.length = 0; // Leeg de blokkenlijst
+      startScreen.setAttribute("visible", "true"); // Toon het startscherm weer
+      resetButton.style
+
+
+
